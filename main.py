@@ -1,4 +1,4 @@
-# coding = utf8
+# coding = UTF-8
 
 from bs4 import BeautifulSoup
 import requests
@@ -8,7 +8,6 @@ from time import sleep
 import sqlite3
 import telebot
 from TK import token
-import asyncio
 
 
 def cutFreeSpace(string):
@@ -143,7 +142,8 @@ def GetData():
         print('Parsing is completed')
 
 def Bot():
-    bot = telebot.TeleBot(token)
+
+    bot = telebot.AsyncTeleBot(token)
     while True:
 
         dict = {
@@ -212,24 +212,17 @@ def Bot():
 
 
 def Timer():
-    sleep(0.5)
+    while True:
+        sleep(0.9)
 
-    localZone = pytz.timezone('Asia/Novosibirsk')
-    localTime = datetime.datetime.now(localZone)
-    hour = localTime.strftime('%H:%M')
+        localZone = pytz.timezone('Asia/Novosibirsk')
+        localTime = datetime.datetime.now(localZone)
+        hour = localTime.strftime('%H:%M')
 
-    print(hour)
+        print(hour)
 
-    if hour == '01:00':
-        GetData()
+        if hour == '01:00' or hour == '01:01':
+            GetData()
 
-while True:
-    st = input("""  Введите start, чтобы запустить парсер."
-               Введите bot, чтобы запустить бота"
-               Введите exit, чтобы выключить программу\n>>>>>>  """)
-    if st == 'start':
-        Timer()
-        GetData()
-        Bot()
-    elif st == 'exit':
-        break
+GetData()
+Bot()
