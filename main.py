@@ -4,10 +4,11 @@ from bs4 import BeautifulSoup
 import requests
 import datetime
 import pytz
-from time import sleep
 import sqlite3
-import telebot
+from aiogram import Bot, Dispatcher, types
+import asyncio
 from TK import token
+from sys import exit
 
 
 def cutFreeSpace(string):
@@ -141,88 +142,96 @@ def GetData():
         print(fn - st)
         print('Parsing is completed')
 
-def Bot():
-
-    bot = telebot.AsyncTeleBot(token)
+async def Timer():
     while True:
-
-        dict = {
-
-            'Понедельник': [],
-            'Вторник': [],
-            'Среда': [],
-            'Четверг': [],
-            'Пятница': [],
-            'Суббота': []
-
-        }
-
-        print('Bot get started!')
-
-        try:
-
-            @bot.message_handler(commands=['start', 'help'])
-            def comands(message):
-                if message.text == '/start':
-                    firstName = message.from_user.first_name
-                    lastName = message.from_user.last_name
-                    bot.send_message(message.chat.id, f'Добро пожаловать в телеграм бота, {firstName} {lastName}')
-                else:
-                    bot.send_message(message.chat.id, 'Чтобы получить расписание напишите номер своей группы:'
-                                                      'К примеру: 4.101-2')
-
-
-            @bot.message_handler(func=lambda message: True)
-            def getSch(message):
-
-                if message.text == '4.101-2':
-                    connection = sqlite3.connect('Data.db')
-                    cur = connection.cursor()
-
-                    for line in cur.execute('SELECT * FROM imit'):
-                        dict[line[0]].append(line[1::])
-
-                    text = ''
-                    border = '////////////////////////////////////////////\n\n'
-                    for x in dict:
-                        text += f"{x} ({dict[x][0][0]})\n\n"
-                        n = 1
-                        t = 0
-                        for y in dict[x]:
-                            if y[3] == 'а)' or y[3] == 'б)':
-                                t += 1
-                                if t == 2:
-                                    t = 0
-                                    n -= 1
-                            line = f'Пара №{n}\n Время: {y[2]}\n{y[3]} {y[4]}\n{y[5]}\n Формат: {y[6]}\n Преподаватель: {y[7]} {y[8]}\n Аудитория: {y[9]}\n\n'
-                            text += line
-                            n += 1
-                        text += border
-
-                    bot.send_message(message.chat.id, text)
-                else:
-                    bot.send_message(message.chat.id, 'К сожалению я еще не могу понять что это значит. '
-                                                      'Возможно вы допустили ошибку в тексте, '
-                                                      'либо данная функция еще не прописана')
-
-            bot.polling()
-        except Exception as ex:
-            print(ex)
-            sleep(1)
-
-
-def Timer():
-    while True:
-        sleep(0.9)
+        await asyncio.sleep(0.9)
 
         localZone = pytz.timezone('Asia/Novosibirsk')
         localTime = datetime.datetime.now(localZone)
-        hour = localTime.strftime('%H:%M')
+        hour = localTime.strftime('%H:%M:%S')
 
-        print(hour)
-
-        if hour == '01:00' or hour == '01:01':
+        if hour == '01:00:00' or hour == '01:00:01':
+            print('Bot stoped')
             GetData()
 
-GetData()
-Bot()
+BOT_TOKEN = token
+
+async def start_handler(message: types.Message):
+    await message.answer(
+        f"Hello, {message.from_user.get_mention(as_html=True)} 👋!",
+        parse_mode=types.ParseMode.HTML,
+    )
+async def echo(message: types.Message):
+
+    days = {
+        'Понедельник': [],
+        'Вторник': [],
+        'Среда': [],
+        'Четверг': [],
+        'Пятница': [],
+        'Суббота': []
+    }
+
+    if message.text == '4.101-2':
+
+        await message.answer('Подождите немного, пожалуйста')
+
+        con = sqlite3.connect('Data.db')
+        cur = con.cursor()
+        for x in cur.execute('SELECT * FROM imit'):
+            x = list(x)
+            del x[2]
+            days[x[0]].append(x[1::])
+
+        text = 'Расписание: \n'
+        border = '\n//////////////////////\n\n'
+
+        for y in days:
+            n = 0
+            text += border
+
+            text += f'{y} {days[y][0][0]}: \n\n'
+            w = 0
+            for z in days[y]:
+                n += 1
+                if z[2] == 'а)' or z[2] == 'б)':
+                    w += 1
+                    if w == 2:
+                        w = 0
+                        n -= 1
+                if z[8] == '':
+                    z[8] = '-----'
+                if z[7] == '':
+                    z[7] = '-----'
+                text += f'Пара: № {str(n)} \n'
+                text += f'Время:  {z[1]} \n{z[2]} {z[3]} {z[4]} {z[5]}\nПреподователь: {z[6]} {z[7]}\nАудитория: {z[8]} \n\n'
+
+        await message.answer(text)
+    else:
+        await message.answer("Это не известная мне команда.")
+
+async def main():
+    bot = Bot(token=BOT_TOKEN)
+    print('bot get started')
+    while True:
+        try:
+            disp = Dispatcher(bot=bot)
+            disp.register_message_handler(start_handler, commands={"start", "restart"})
+            disp.register_message_handler(echo, lambda message: message.text)
+            await disp.start_polling()
+        except Exception as ex:
+            print(ex)
+            await asyncio.sleep(1)
+        finally:
+            await bot.close()
+
+while True:
+    st = input('Enter start to start. \nEnter exit to close program. \n>>>>>> ')
+
+    if st == 'start':
+        loop = asyncio.get_event_loop()
+        tasks = [loop.create_task(main()), loop.create_task(Timer())]
+        wait_tasks = asyncio.wait(tasks)
+        loop.run_until_complete(wait_tasks)
+    elif st == 'exit':
+        exit()
