@@ -229,6 +229,7 @@ while True:
     st = input('Enter start to start. \nEnter exit to close program. \n>>>>>> ')
 
     if st == 'start':
+        GetData()
         loop = asyncio.get_event_loop()
         tasks = [loop.create_task(main()), loop.create_task(Timer())]
         wait_tasks = asyncio.wait(tasks)
